@@ -1,0 +1,19 @@
+# Sobe o nginx real (imagem do web) contra servicos-stub. Usado por tests/run.sh.
+name: datarepo-web-routing-test
+services:
+  stub:
+    image: python:3.11-slim
+    command: ["python", "/stub/stub.py"]
+    volumes:
+      - ./stub.py:/stub/stub.py:ro
+
+  web:
+    build: ..
+    environment:
+      DATAREPO_API_UPSTREAM: stub:5001
+      DATAREPO_QUERY_UPSTREAM: stub:5002
+      DATAREPO_INGESTION_UPSTREAM: stub:5003
+    ports:
+      - "127.0.0.1:18080:8080"
+    depends_on:
+      - stub

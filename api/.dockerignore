@@ -1,0 +1,24 @@
+# Na imagem entra so o que o api executa: app.py, db.py, kit/, routes/,
+# services/, migrations/ e alembic.ini.
+.git
+.github
+.venv
+venv
+.local
+.cache
+.pytest_cache
+**/__pycache__
+repos
+deploy
+docs
+tools
+tests
+scripts
+*.md
+.env
+.env.*
+sbom.cdx.json
+.quality
+risk-map.yml
+.coveragerc
+requirements-dev.*

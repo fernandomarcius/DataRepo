@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+*.bak
+
+# Node
+node_modules/
+**/node_modules/
+.npm
+*.log
+dist/
+build/
+
+# Docker
+docker-compose.override.yml
+
+# Backups
+backup_*/
+backups/
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spec-Kit / Claude Code
+.specify/
+.claude/
+specs/
+CLAUDE.md
+
+# Git worktrees
+.worktrees/
+.env.images
+.env.images.*
+.cutover-done
+.deploy.lock
+.local/
+.pytest_cache/
+sbom.cdx.json

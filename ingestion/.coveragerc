@@ -1,0 +1,9 @@
+# Cobertura das suítes (pytest --cov). Fora da medição: os próprios testes e scripts manuais
+# (scripts/), que não são exercitados pelo pytest.
+[run]
+source = .
+omit =
+    tests/*
+    scripts/*
+    .github/*
+    .venv/*

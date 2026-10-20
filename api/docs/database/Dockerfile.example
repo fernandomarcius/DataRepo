@@ -1,0 +1,35 @@
+# EXEMPLO — o DataRepo NAO sobe o banco: os servicos apontam para um
+# Postgres que ja existe (DATABASE_URL). Este Dockerfile documenta o que esse
+# banco precisa ter, e e usado pelos testes de migration (tools/check-migrations.sh).
+#
+# Requisitos:
+#   - PostgreSQL 15
+#   - pg_cron, carregado via shared_preload_libraries e com cron.database_name
+#     apontando para o banco da aplicacao: refresh agendado de views
+#     materializadas (sem ele, materializar funciona mas sem agendamento)
+#   - tds_fdw: conexoes com SQL Server; postgres_fdw (contrib): conexoes com
+#     Postgres externo
+#   - timezone America/Sao_Paulo (datas de registro e agenda do pg_cron)
+#   - o usuario da aplicacao precisa poder criar tabelas, views, funcoes,
+#     SERVER/USER MAPPING e schemas no banco. CREATE EXTENSION exige
+#     superusuario: se o usuario da aplicacao nao for, crie as extensoes antes.
+FROM postgres:15
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      postgresql-15-tds-fdw \
+      postgresql-15-cron \
+      postgresql-contrib \
+ && rm -rf /var/lib/apt/lists/*
+
+# Sem `USER`: o entrypoint oficial comeca como root so para acertar o dono do
+# diretorio de dados e rebaixa para `postgres` (gosu) antes de iniciar o servidor.
+# nosemgrep: dockerfile.security.missing-user.missing-user -- entrypoint oficial rebaixa para postgres via gosu
+CMD ["postgres", \
+     "-c", "shared_preload_libraries=pg_cron", \
+     "-c", "cron.database_name=data_app", \
+     "-c", "timezone=America/Sao_Paulo", \
+     "-c", "cron.timezone=America/Sao_Paulo"]
+
+HEALTHCHECK --interval=5s --timeout=5s --start-period=30s --retries=10 \
+  CMD ["sh", "-c", "pg_isready -U \"${POSTGRES_USER:-postgres}\" -d \"${POSTGRES_DB:-postgres}\""]

@@ -1,0 +1,47 @@
+# Desenvolvimento local: constroi as tres imagens e sobe um Postgres de dev.
+#
+#   cd deploy && cp .env.example .env
+#   docker compose -f docker-compose.app.yml -f docker-compose.dev.yml up -d --build
+#   docker compose -f docker-compose.app.yml -f docker-compose.dev.yml run --rm api alembic upgrade head
+#
+# Em producao nao ha banco na composicao; aqui ha, construido do exemplo em
+# docs/database/, para o ambiente local ter pg_cron e FDW como o de producao.
+#
+# Caminhos de codigo: o api e a raiz deste repositorio. web e ingestion vem de
+# DATAREPO_WEB_SRC / DATAREPO_INGESTION_SRC — por padrao ../../ingestion e ../../web;
+# depois da separacao, aponte para os clones (ex.: ../../datarepo-web).
+services:
+  db:
+    build:
+      context: ../docs/database
+      dockerfile: Dockerfile.example
+    image: datarepo-db:local
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: data_app
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    ports:
+      - "5433:5432"
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: { context: .. }
+    depends_on:
+      db: { condition: service_healthy }
+  api-query:
+    build: { context: .. }
+    depends_on:
+      db: { condition: service_healthy }
+  ingestion:
+    build: { context: "${DATAREPO_INGESTION_SRC:-../../ingestion}" }
+    depends_on:
+      db: { condition: service_healthy }
+  web:
+    build: { context: "${DATAREPO_WEB_SRC:-../../web}" }
+
+volumes:
+  dev_postgres_data:
+    name: datarepo_dev_postgres_data

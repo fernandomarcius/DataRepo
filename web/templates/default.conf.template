@@ -1,0 +1,106 @@
+# nginx do DataRepo: serve o SPA e e a borda da API (unico container
+# publicado no host).
+#
+# Roteia /api por PREFIXO, sem reescrever nada: o api e o ingestion atendem os
+# mesmos caminhos /api/v1/... do monolito, entao o frontend e integracoes nao
+# mudam.
+#
+# Variaveis ${DATAREPO_*} sao preenchidas pelo entrypoint do nginx (envsubst) a
+# partir do ambiente; defaults no Dockerfile. NGINX_ENVSUBST_FILTER=DATAREPO_ impede
+# que o envsubst toque nas variaveis do proprio nginx ($host, $uri, ...).
+#
+# proxy_pass com VARIAVEL + resolver: o nome do servico e resolvido a cada
+# requisicao (cache de 10s), nao so no boot. Sem isso o nginx nao sobe com um
+# servico fora do ar, e continuaria mandando trafego para o IP antigo depois que
+# o deploy recriasse o container.
+
+resolver ${DATAREPO_RESOLVER} valid=10s ipv6=off;
+resolver_timeout 5s;
+
+server {
+    listen 8080;
+    server_tokens off;
+
+    # Uploads de ate 100 MB (ingestion) e consultas longas (query, relatorios).
+    client_max_body_size 100M;
+    proxy_connect_timeout 300;
+    proxy_send_timeout 300;
+    proxy_read_timeout 300;
+
+    # $http_host preserva a porta; $host a descarta e quebraria o link de reset
+    # de senha quando o app roda fora da porta 80.
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    # Sobrescreve (nao acrescenta): este nginx e a borda, entao qualquer
+    # X-Forwarded-For vindo do cliente e forjavel e descartado. api e ingestion
+    # confiam em exatamente um salto (ProxyFix x_for=1 em kit/web.py).
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+
+    set $api       ${DATAREPO_API_UPSTREAM};
+    set $query     ${DATAREPO_QUERY_UPSTREAM};
+    set $ingestion ${DATAREPO_INGESTION_UPSTREAM};
+
+    # Saude do proprio nginx (nao depende de nenhum servico).
+    location = /healthz {
+        access_log off;
+        default_type application/json;
+        return 200 '{"status":"ok","service":"web"}';
+    }
+
+    # Rotas servico-a-servico NUNCA saem pela borda.
+    location /internal/ {
+        return 404;
+    }
+    location /api/v1/internal/ {
+        return 404;
+    }
+
+    # --- ingestion ------------------------------------------------------
+    location = /api/v1/upload {
+        proxy_pass http://$ingestion;
+    }
+    location = /api/v1/map-file {
+        proxy_pass http://$ingestion;
+    }
+    location = /api/v1/inspect-headers {
+        proxy_pass http://$ingestion;
+    }
+    # Regex tem precedencia sobre os prefixos abaixo: sem ela o append de linhas
+    # cairia no api, dono do resto de /api/v1/tables/.
+    location ~ ^/api/v1/tables/[^/]+/data$ {
+        proxy_pass http://$ingestion;
+    }
+
+    # --- query ----------------------------------------------------------
+    # Mesmo codigo do api, container separado (api-query): consulta de ate 240 s
+    # nao ocupa os workers que atendem login e cadastros.
+    location = /api/v1/query {
+        proxy_pass http://$query;
+    }
+
+    # --- api (todo o resto de /api) ----------------------------------------
+    location /api/ {
+        proxy_pass http://$api;
+    }
+
+    # --- SPA ------------------------------------------------------------
+    # nosemgrep: header-redefinition -- server nao define add_header, nada e perdido
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+    }
+
+    # Bundle com hash no nome: cache longo e imutavel, de proposito.
+    # nosemgrep: header-redefinition -- assets tem cache proprio, imutavel, de proposito
+    location /assets/ {
+        root /usr/share/nginx/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+    }
+}

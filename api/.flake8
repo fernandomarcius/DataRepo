@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203, W503
+# Ambiente virtual ou instalacao --user dentro do servico faria o lint varrer
+# site-packages e reprovar por codigo de terceiro.
+exclude = .git,.github,__pycache__,.pytest_cache,.local,.venv,venv,node_modules

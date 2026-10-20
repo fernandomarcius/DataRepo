@@ -1,0 +1,18 @@
+flask
+flask-cors
+# 26 abre um socket de controle em /app/.gunicorn por padrao; o CMD o desliga
+# (--no-control-socket), opcao que so existe a partir da 26.
+gunicorn>=26,<27
+# 2.1 trocou o driver padrao de postgresql:// para psycopg 3 (nao instalado);
+# o codigo usa psycopg2 (psycopg2-binary abaixo).
+sqlalchemy>=2.0,<2.1
+psycopg2-binary
+PyJWT>=2.8,<3
+pandas
+openpyxl
+python-calamine
+xlrd>=2.0.1
+camelot-py
+opencv-python-headless
+ghostscript
+pytz

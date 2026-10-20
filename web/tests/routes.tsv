@@ -1,0 +1,50 @@
+# Contrato de roteamento do nginx: regra Flask -> caminho de exemplo -> destino.
+#
+# Destinos: api (container `api`), query (container `api-query`, mesma imagem do
+# api), ingestion, spa (arquivo estatico do proprio nginx).
+#
+# Duas verificacoes usam este arquivo:
+#   - tests/run.sh sobe o nginx REAL contra servicos-stub e confere, para cada
+#     linha, que o caminho de exemplo chega ao destino esperado (e intacto);
+#   - tools/check-route-contract.py (no DataRepo/api) confere que toda rota
+#     publica declarada no api e no ingestion aparece aqui apontando para ele.
+# Rota nova num servico sem linha aqui reprova a segunda; linha aqui sem bloco
+# `location` correspondente reprova a primeira.
+#
+# regra	caminho_de_exemplo	destino
+/api/v1/auth/login	/api/v1/auth/login	api
+/api/v1/auth/me	/api/v1/auth/me	api
+/api/v1/auth/forgot-password	/api/v1/auth/forgot-password	api
+/api/v1/auth/reset-password	/api/v1/auth/reset-password	api
+/api/v1/auth/change-password	/api/v1/auth/change-password	api
+/api/v1/users	/api/v1/users	api
+/api/v1/users/<int:user_id>	/api/v1/users/3	api
+/api/v1/audit-logs	/api/v1/audit-logs?page=2&q=x	api
+/api/v1/audit-logs/<int:log_id>	/api/v1/audit-logs/9	api
+/api/v1/map-file	/api/v1/map-file	ingestion
+/api/v1/inspect-headers	/api/v1/inspect-headers	ingestion
+/api/v1/upload	/api/v1/upload	ingestion
+/api/v1/tables/<table_name>/data	/api/v1/tables/vendas_2026/data	ingestion
+/api/v1/tables	/api/v1/tables	api
+/api/v1/tables/<table_name>/schema	/api/v1/tables/vendas_2026/schema	api
+/api/v1/tables/<table_name>	/api/v1/tables/vendas_2026	api
+/api/v1/views/<view_name>	/api/v1/views/v_vendas	api
+/api/v1/reports	/api/v1/reports	api
+/api/v1/reports/<int:report_id>	/api/v1/reports/4	api
+/api/v1/reports/<int:report_id>/materialize	/api/v1/reports/4/materialize	api
+/api/v1/reports/<int:report_id>/refresh	/api/v1/reports/4/refresh	api
+/api/v1/reports/<int:report_id>/execute	/api/v1/reports/4/execute	api
+/api/v1/query	/api/v1/query	query
+/api/v1/functions	/api/v1/functions	api
+/api/v1/functions/<int:function_id>	/api/v1/functions/2	api
+/api/v1/functions/validate	/api/v1/functions/validate	api
+/api/v1/connections	/api/v1/connections	api
+/api/v1/connections/<int:connection_id>	/api/v1/connections/5	api
+/api/v1/connections/test	/api/v1/connections/test	api
+/api/v1/connections/<int:connection_id>/sync	/api/v1/connections/5/sync	api
+/api/v1/connections/<int:connection_id>/tables	/api/v1/connections/5/tables	api
+/api/v1/connections/<int:connection_id>/tables/<table_name>/schema	/api/v1/connections/5/tables/clientes/schema	api
+-	/	spa
+-	/reset-password/abc	spa
+-	/relatorios/qualquer-rota-do-spa	spa
+-	/api/v1/rota-desconhecida	api

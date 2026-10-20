@@ -1,0 +1,81 @@
+# Composicao de producao do DataRepo: tres imagens, quatro containers.
+#
+#   web        SPA + nginx de borda (unico container com porta publicada)
+#   api        backend (tudo menos upload/parsing)
+#   api-query  a MESMA imagem do api, so para /api/v1/query (consultas longas)
+#   ingestion  upload e parsing de Excel/CSV/PDF
+#
+# O banco NAO faz parte desta composicao: os servicos apontam para um Postgres
+# que ja existe (DATABASE_URL). O que ele precisa ter esta em docs/database/.
+# O schema e aplicado pelas migrations do api (alembic upgrade head).
+#
+# Imagens SEMPRE por digest, via .env.images.
+# Os defaults `:local` existem so para desenvolvimento (docker-compose.dev.yml os
+# constroi) e nunca sao puxaveis de registry: .env.images incompleto falha no
+# `pull` em vez de subir uma imagem que nenhum gate viu.
+#
+# Projeto proprio (datarepo_app), separado do projeto do monolito
+# (datarepo): assim nenhum `up --remove-orphans` daqui alcanca o container do
+# banco que o monolito criou.
+name: datarepo_app
+
+x-banco: &banco
+  DATABASE_URL: ${DATABASE_URL}
+  LOCAL_SCHEMA: ${LOCAL_SCHEMA:-public}
+
+x-python: &python
+  restart: unless-stopped
+  # Permite DATABASE_URL apontar para o servidor de banco no proprio host
+  # (PgBouncer na porta 6432) sem colocar o banco nesta composicao.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # Sem porta publicada: o unico caminho ate api/ingestion e o nginx do web. E
+  # isso que torna seguro confiar em um salto de X-Forwarded-For (kit/web.py).
+
+services:
+  api:
+    <<: *python
+    image: ${API_IMAGE:-datarepo-api:local}
+    environment:
+      <<: *banco
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SMTP_SERVER: ${SMTP_SERVER}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      CONNECTIONS_ENCRYPTION_KEY: ${CONNECTIONS_ENCRYPTION_KEY}
+
+  api-query:
+    <<: *python
+    image: ${API_IMAGE:-datarepo-api:local}
+    environment:
+      <<: *banco
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_NAME: api-query
+      # Seed do admin, limpeza de tokens e reconciliacao de materializacoes sao
+      # do container `api`; rodar em dois lugares so criaria corrida.
+      RUN_STARTUP_TASKS: "0"
+
+  ingestion:
+    <<: *python
+    image: ${INGESTION_IMAGE:-datarepo-ingestion:local}
+    environment:
+      <<: *banco
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      AUDIT_SERVICE_URL: http://api:5000
+
+  web:
+    image: ${WEB_IMAGE:-datarepo-web:local}
+    restart: unless-stopped
+    ports:
+      # As duas portas do monolito: 5173 era o frontend e 5000 o backend. O nginx
+      # atende as duas para que nenhum usuario ou integracao troque de endereco.
+      # As variaveis so permitem que o ensaio local evite portas ja ocupadas;
+      # em producao, sem override, os enderecos continuam exatamente os mesmos.
+      - "${DATAREPO_WEB_EDGE_PORT:-5173}:8080"
+      - "${DATAREPO_API_EDGE_PORT:-5000}:8080"

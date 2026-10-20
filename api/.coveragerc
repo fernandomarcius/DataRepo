@@ -1,0 +1,13 @@
+# Cobertura das suítes (pytest --cov). Fora da medição: os próprios testes, as migrations
+# (verificadas contra Postgres real pelo nó `migrations`), e scripts de operação/CI (deploy/, tools/,
+# scripts/), que têm nós próprios (ensaio de deploy, shellcheck) e não são exercitados pelo pytest.
+[run]
+source = .
+omit =
+    tests/*
+    migrations/*
+    deploy/*
+    tools/*
+    scripts/*
+    .github/*
+    .venv/*

@@ -1,0 +1,15 @@
+# Ignore local artifacts
+node_modules
+.dist
+dist
+.git
+.gitignore
+Dockerfile
+Dockerfile.*
+.env
+.vscode
+README.md
+tests
+coverage
+.quality
+risk-map.yml
